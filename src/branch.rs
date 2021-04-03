@@ -1,6 +1,6 @@
 use crate::File;
 
-#[allow(dead_code)]
+/// A reference to a branch on the git repo.
 pub struct Branch<'a> {
     pub(crate) repo: &'a git2::Repository,
     pub(crate) branch: git2::Branch<'a>,
@@ -14,18 +14,31 @@ impl<'a> Branch<'a> {
         Ok(Branch { repo, branch, tree })
     }
 
-    pub fn list_files(&self, mut cb: impl FnMut(&File)) -> Result<(), git2::Error> {
+    /// List all the files on the newest commit of the current branch.
+    pub fn list_files(
+        &self,
+        mut cb: impl FnMut(&File) -> Result<(), git2::Error>,
+    ) -> Result<(), git2::Error> {
+        let mut result = Ok(());
         self.tree.walk(git2::TreeWalkMode::PreOrder, |_, entry| {
             let file = File {
                 branch: self,
                 entry: entry.clone(),
             };
-            cb(&file);
-            git2::TreeWalkResult::Ok
+            if let Err(e) = cb(&file) {
+                result = Err(e);
+                git2::TreeWalkResult::Abort
+            } else {
+                git2::TreeWalkResult::Ok
+            }
         })?;
-        Ok(())
+
+        result
     }
 
+    /// Get a file by the given path in the last commit of the current branch.
+    ///
+    /// Will return `Ok(None)` if the file is not found.
     pub fn get_file_by_path(&'a self, path: &'a str) -> Result<Option<File<'a>>, git2::Error> {
         let entry = match self.tree.get_name(path) {
             Some(e) => e,

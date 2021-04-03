@@ -1,15 +1,20 @@
 use crate::{Branch, Commit};
 
+/// A reference to a file on a certain commit.
 pub struct File<'a> {
     pub(crate) branch: &'a Branch<'a>,
     pub(crate) entry: git2::TreeEntry<'a>,
 }
 
 impl<'a> File<'a> {
+    /// The path of the file in the repository.
     pub fn path(&self) -> &str {
         self.entry.name().unwrap()
     }
 
+    /// Read the contents of the file as a string.
+    /// Will use a lossy encoding.
+    /// See [String::from_utf_lossy] for more information.
     pub fn read_content_string(&self) -> Result<String, git2::Error> {
         let object = self.entry.to_object(self.branch.repo)?;
         let blob = object.peel_to_blob()?;
@@ -17,6 +22,7 @@ impl<'a> File<'a> {
         Ok(content.to_string())
     }
 
+    /// Iterate over the commits that modified this file. The newest commit is listed first.
     pub fn history(&'a self, mut cb: impl FnMut(Commit<'a>)) -> Result<(), git2::Error> {
         // Huge thanks to kvzn on github
         // https://github.com/rust-lang/git2-rs/issues/588#issuecomment-658510497
