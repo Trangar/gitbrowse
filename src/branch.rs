@@ -15,25 +15,9 @@ impl<'a> Branch<'a> {
     }
 
     /// List all the files on the newest commit of the current branch.
-    pub fn list_files(
-        &self,
-        mut cb: impl FnMut(&File) -> Result<(), git2::Error>,
-    ) -> Result<(), git2::Error> {
-        let mut result = Ok(());
-        self.tree.walk(git2::TreeWalkMode::PreOrder, |_, entry| {
-            let file = File {
-                branch: self,
-                entry: entry.clone(),
-            };
-            if let Err(e) = cb(&file) {
-                result = Err(e);
-                git2::TreeWalkResult::Abort
-            } else {
-                git2::TreeWalkResult::Ok
-            }
-        })?;
-
-        result
+    pub fn list_files(&'a self) -> impl Iterator<Item = File<'a>> {
+        let iter = self.tree.iter();
+        BranchFileIterator { branch: self, iter }
     }
 
     /// Get a file by the given path in the last commit of the current branch.
@@ -49,5 +33,27 @@ impl<'a> Branch<'a> {
             branch: self,
             entry,
         }))
+    }
+}
+
+struct BranchFileIterator<'a> {
+    branch: &'a Branch<'a>,
+    iter: git2::TreeIter<'a>,
+}
+
+impl<'a> Iterator for BranchFileIterator<'a> {
+    type Item = File<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let file = self.iter.next()?;
+
+            if file.kind() == Some(git2::ObjectType::Blob) {
+                return Some(File {
+                    branch: self.branch,
+                    entry: file,
+                });
+            }
+        }
     }
 }

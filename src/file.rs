@@ -1,4 +1,5 @@
 use crate::{Branch, Commit};
+use std::path::Path;
 
 /// A reference to a file on a certain commit.
 pub struct File<'a> {
@@ -23,46 +24,79 @@ impl<'a> File<'a> {
     }
 
     /// Iterate over the commits that modified this file. The newest commit is listed first.
-    pub fn history(&'a self, mut cb: impl FnMut(Commit<'a>)) -> Result<(), git2::Error> {
-        // Huge thanks to kvzn on github
-        // https://github.com/rust-lang/git2-rs/issues/588#issuecomment-658510497
+    pub fn history(
+        &'a self,
+    ) -> Result<impl Iterator<Item = Result<Commit<'a>, git2::Error>>, git2::Error> {
+        FileHistory::new(self)
+    }
+}
 
-        let commit = self.branch.branch.get().peel_to_commit()?;
+// Huge thanks to kvzn on github
+// https://github.com/rust-lang/git2-rs/issues/588#issuecomment-658510497
 
-        let mut revwalk = self.branch.repo.revwalk()?;
+struct FileHistory<'a> {
+    file: &'a File<'a>,
+    revwalk: git2::Revwalk<'a>,
+    file_path: &'a Path,
+}
+
+impl<'a> FileHistory<'a> {
+    fn new(file: &'a File<'a>) -> Result<Self, git2::Error> {
+        let commit = file.branch.branch.get().peel_to_commit()?;
+
+        let mut revwalk = file.branch.repo.revwalk()?;
         revwalk.push(commit.id())?;
         revwalk.set_sorting(git2::Sort::TIME)?;
 
-        let file_path = std::path::Path::new(self.path());
+        let file_path = std::path::Path::new(file.path());
 
-        for oid in revwalk {
-            let oid = oid?;
-            let commit = self.branch.repo.find_commit(oid)?;
-            let tree = commit.tree()?;
+        Ok(Self {
+            file,
+            revwalk,
+            file_path,
+        })
+    }
 
-            let old_tree = if commit.parent_count() > 0 {
-                Some(commit.parent(0)?.tree()?)
-            } else {
-                None
-            };
+    fn get_commit_from_oid(
+        &mut self,
+        oid: Result<git2::Oid, git2::Error>,
+    ) -> Result<Option<git2::Commit<'a>>, git2::Error> {
+        let oid = oid?;
+        let commit = self.file.branch.repo.find_commit(oid)?;
+        let tree = commit.tree()?;
+        let old_tree = if commit.parent_count() > 0 {
+            Some(commit.parent(0)?.tree()?)
+        } else {
+            None
+        };
+        let diff = self
+            .file
+            .branch
+            .repo
+            .diff_tree_to_tree(old_tree.as_ref(), Some(&tree), None)?;
+        let mut deltas = diff.deltas();
 
-            let diff = self
-                .branch
-                .repo
-                .diff_tree_to_tree(old_tree.as_ref(), Some(&tree), None)?;
+        let contains = deltas.any(|dd| {
+            let new_file_path = dd.new_file().path().unwrap();
+            new_file_path.eq(self.file_path)
+        });
 
-            let mut deltas = diff.deltas();
+        Ok(if contains { Some(commit) } else { None })
+    }
+}
 
-            let contains = deltas.any(|dd| {
-                let new_file_path = dd.new_file().path().unwrap();
-                new_file_path.eq(file_path)
-            });
+impl<'a> Iterator for FileHistory<'a> {
+    type Item = Result<Commit<'a>, git2::Error>;
 
-            if contains {
-                cb(Commit::from_file(self, commit));
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(oid) = self.revwalk.next() {
+            match self.get_commit_from_oid(oid) {
+                Err(e) => return Some(Err(e)),
+                Ok(None) => continue,
+                Ok(Some(commit)) => return Some(Ok(Commit::from_file(self.file, commit))),
             }
         }
 
-        Ok(())
+        None
     }
 }
