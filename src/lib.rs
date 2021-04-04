@@ -10,7 +10,14 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //! let repo = Repo::open(".")?;
-//! let branch = repo.browse_branch("main")?;
+//!
+//! let branches = repo.list_branches()?;
+//! println!("Found the following branches:");
+//! for branch in &branches {
+//!     println!(" - {}", branch);
+//! }
+//!
+//! let branch = repo.browse_branch(branches.first().unwrap())?;
 //! for file in branch.list_files() {
 //!     println!("Found file: {:?}", file.path());
 //!     println!("File's content is length {}", file.read_content_string()?.len());
