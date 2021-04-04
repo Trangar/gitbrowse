@@ -17,6 +17,10 @@
 //!     println!(" - {}", branch);
 //! }
 //!
+//! # if branches.is_empty() {
+//! #     return Ok(());
+//! # }
+//!
 //! let branch = repo.browse_branch(branches.first().unwrap())?;
 //! for file in branch.list_files() {
 //!     println!("Found file: {:?}", file.path());
