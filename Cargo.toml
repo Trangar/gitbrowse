@@ -1,10 +1,16 @@
 [package]
 name = "gitbrowse"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Trangar <victor.koenders@gmail.com>"]
 edition = "2018"
+license-file = "LICENSE"
+description = "A simple way to browse a git repository"
+readme = "README.md"
+documentation = "https://docs.rs/gitbrowse"
+repository = "https://github.com/trangar/gitbrowse"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[badges]
+github = { repository = "Trangar/gitbrowse", workflow = "Rust" }
 
 [dependencies]
 git2 = "0.13"

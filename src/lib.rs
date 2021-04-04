@@ -1,7 +1,5 @@
 #![warn(missing_docs)]
 
-//! # GitBrowse
-//!
 //! A crate to browse a git repository in a way that most people are used to.
 //! Heavily inspired by how people browse a git repository on github and gitlab.
 //!
