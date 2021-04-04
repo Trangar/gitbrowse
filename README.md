@@ -1,5 +1,7 @@
 # GitBrowse
 
+[![Rust](https://github.com/Trangar/gitbrowse/actions/workflows/rust.yml/badge.svg)](https://github.com/Trangar/gitbrowse/actions/workflows/rust.yml)
+
 A crate to browse a git repository in a way that most people are used to.
 Heavily inspired by how people browse a git repository on github and gitlab.
 
