@@ -24,8 +24,9 @@
 //!     
 //!     println!("File is modified in the following commits:");
 //!     for commit in file.history()? {
-//!         let commit = commit?;
-//!         println!("  {}: {}", commit.id(), commit.message());
+//!         if let Ok(commit) = commit {
+//!             println!("  {}: {}", commit.id(), commit.message());
+//!         }
 //!     }
 //! }
 //!
