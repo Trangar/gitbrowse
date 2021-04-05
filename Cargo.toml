@@ -1,6 +1,6 @@
 [package]
 name = "gitbrowse"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Trangar <victor.koenders@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
@@ -12,5 +12,15 @@ repository = "https://github.com/trangar/gitbrowse"
 [badges]
 github = { repository = "Trangar/gitbrowse", workflow = "Rust" }
 
-[dependencies]
-git2 = "0.13"
+[dependencies.git2]
+version = "0.13"
+default-features = false
+
+[features]
+unstable = ["git2/unstable"]
+default = ["git2/default"]
+ssh = ["git2/ssh"]
+https = ["git2/https"]
+vendored-openssl = ["git2/vendored-openssl"]
+ssh_key_from_memory = ["git2/ssh_key_from_memory"]
+zlib-ng-compat = ["git2/zlib-ng-compat"]
