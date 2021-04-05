@@ -1,4 +1,4 @@
-use crate::{Commit, File};
+use crate::{Commit, Error, File};
 
 /// A reference to a branch on the git repo.
 pub struct Branch<'a> {
@@ -8,7 +8,7 @@ pub struct Branch<'a> {
 }
 
 impl<'a> Branch<'a> {
-    pub(crate) fn new(repo: &'a git2::Repository, branch: &str) -> Result<Self, git2::Error> {
+    pub(crate) fn new(repo: &'a git2::Repository, branch: &str) -> Result<Self, Error> {
         let branch = repo.find_branch(branch, git2::BranchType::Local)?;
         let tree = branch.get().peel_to_tree()?;
         Ok(Branch { repo, branch, tree })
@@ -26,7 +26,7 @@ impl<'a> Branch<'a> {
     }
 
     /// Returns an iterator of all the commits on this branch. Will return the newest commit first.
-    pub fn commits(&'a self) -> Result<impl Iterator<Item = Commit<'a>>, git2::Error> {
+    pub fn commits(&'a self) -> Result<impl Iterator<Item = Commit<'a>>, Error> {
         let commit = self.branch.get().peel_to_commit()?;
         Ok(BranchCommitIterator {
             commit: Some(commit),
@@ -36,7 +36,7 @@ impl<'a> Branch<'a> {
     /// Get a file by the given path in the last commit of the current branch.
     ///
     /// Will return `Ok(None)` if the file is not found.
-    pub fn get_file_by_path(&'a self, path: &'a str) -> Result<Option<File<'a>>, git2::Error> {
+    pub fn get_file_by_path(&'a self, path: &'a str) -> Result<Option<File<'a>>, Error> {
         let entry = match self.tree.get_name(path) {
             Some(e) => e,
             None => return Ok(None),
@@ -96,7 +96,7 @@ fn test_commits() {
     // Sometimes in CI we don't have any branches
     let branch_name = match branches.first() {
         Some(name) => name,
-        None => return
+        None => return,
     };
     let branch = repo.browse_branch(&branch_name).unwrap();
 

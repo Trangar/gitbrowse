@@ -1,4 +1,4 @@
-use crate::{Branch, Commit};
+use crate::{Branch, Commit, Error};
 use std::path::Path;
 
 /// A reference to a file on a certain commit.
@@ -16,7 +16,7 @@ impl<'a> File<'a> {
     /// Read the contents of the file as a string.
     /// Will use a lossy encoding.
     /// See [String::from_utf_lossy] for more information.
-    pub fn read_content_string(&self) -> Result<String, git2::Error> {
+    pub fn read_content_string(&self) -> Result<String, Error> {
         let object = self.entry.to_object(self.branch.repo)?;
         let blob = object.peel_to_blob()?;
         let content = String::from_utf8_lossy(blob.content());
@@ -24,9 +24,7 @@ impl<'a> File<'a> {
     }
 
     /// Iterate over the commits that modified this file. The newest commit is listed first.
-    pub fn history(
-        &'a self,
-    ) -> Result<impl Iterator<Item = Result<Commit<'a>, git2::Error>>, git2::Error> {
+    pub fn history(&'a self) -> Result<impl Iterator<Item = Result<Commit<'a>, Error>>, Error> {
         FileHistory::new(self)
     }
 }
@@ -41,7 +39,7 @@ struct FileHistory<'a> {
 }
 
 impl<'a> FileHistory<'a> {
-    fn new(file: &'a File<'a>) -> Result<Self, git2::Error> {
+    fn new(file: &'a File<'a>) -> Result<Self, Error> {
         let commit = file.branch.branch.get().peel_to_commit()?;
 
         let mut revwalk = file.branch.repo.revwalk()?;
@@ -59,8 +57,8 @@ impl<'a> FileHistory<'a> {
 
     fn get_commit_from_oid(
         &mut self,
-        oid: Result<git2::Oid, git2::Error>,
-    ) -> Result<Option<git2::Commit<'a>>, git2::Error> {
+        oid: Result<git2::Oid, Error>,
+    ) -> Result<Option<git2::Commit<'a>>, Error> {
         let oid = oid?;
         let commit = self.file.branch.repo.find_commit(oid)?;
         let tree = commit.tree()?;
@@ -86,7 +84,7 @@ impl<'a> FileHistory<'a> {
 }
 
 impl<'a> Iterator for FileHistory<'a> {
-    type Item = Result<Commit<'a>, git2::Error>;
+    type Item = Result<Commit<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(oid) = self.revwalk.next() {

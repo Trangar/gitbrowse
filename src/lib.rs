@@ -48,3 +48,5 @@ pub use self::commit::Commit;
 pub use self::file::File;
 pub use self::repo::Repo;
 pub use self::utils::*;
+
+pub use git2::Error;

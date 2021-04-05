@@ -1,4 +1,4 @@
-use crate::{Branch, NameWithId};
+use crate::{Branch, Error, NameWithId};
 use std::path::Path;
 
 /// A reference to an opened repository.
@@ -8,18 +8,18 @@ pub struct Repo {
 
 impl Repo {
     /// Open the repository at the given path
-    pub fn open(path: impl AsRef<Path>) -> Result<Repo, git2::Error> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Repo, Error> {
         let repo = git2::Repository::open(path)?;
         Ok(Repo { repo })
     }
 
     /// Browse a branch with the given name. Will return an error if the branch is not found.
-    pub fn browse_branch<'a>(&'a self, branch: &str) -> Result<Branch<'a>, git2::Error> {
+    pub fn browse_branch<'a>(&'a self, branch: &str) -> Result<Branch<'a>, Error> {
         Branch::new(&self.repo, branch)
     }
 
     /// Attempt to get the current branch. This will return `None` if the current git `HEAD` is detached.
-    pub fn current_branch(&self) -> Result<Option<Branch>, git2::Error> {
+    pub fn current_branch(&self) -> Result<Option<Branch>, Error> {
         let head = self.repo.head()?;
         Ok(if let Some(target) = head.symbolic_target() {
             Some(self.browse_branch(target)?)
@@ -29,7 +29,7 @@ impl Repo {
     }
 
     /// List all branches and the ID of the last commit of that branch.
-    pub fn list_branches_with_newest_commit_id(&self) -> Result<Vec<NameWithId>, git2::Error> {
+    pub fn list_branches_with_newest_commit_id(&self) -> Result<Vec<NameWithId>, Error> {
         let branches = self.repo.branches(Some(git2::BranchType::Local))?;
 
         let mut result = Vec::new();
@@ -46,7 +46,7 @@ impl Repo {
     }
 
     /// List all branches.
-    pub fn list_branches(&self) -> Result<Vec<String>, git2::Error> {
+    pub fn list_branches(&self) -> Result<Vec<String>, Error> {
         Ok(self
             .list_branches_with_newest_commit_id()?
             .into_iter()
@@ -55,7 +55,7 @@ impl Repo {
     }
 
     /// List all tags and the commit ID of that tag.
-    pub fn list_tags_with_commit_id(&self) -> Result<Vec<NameWithId>, git2::Error> {
+    pub fn list_tags_with_commit_id(&self) -> Result<Vec<NameWithId>, Error> {
         let mut result = Vec::new();
 
         self.repo.tag_foreach(|oid, bytes| {
@@ -74,7 +74,7 @@ impl Repo {
     }
 
     /// List all tags.
-    pub fn list_tags(&self) -> Result<Vec<String>, git2::Error> {
+    pub fn list_tags(&self) -> Result<Vec<String>, Error> {
         Ok(self
             .list_tags_with_commit_id()?
             .into_iter()
