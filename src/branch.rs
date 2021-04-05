@@ -95,6 +95,8 @@ fn test_commits() {
     let branch_name = branches.first().unwrap();
     let branch = repo.browse_branch(&branch_name).unwrap();
 
+    assert_eq!(branch_name, branch.name());
+
     let commits: Vec<_> = branch.commits().unwrap().collect();
     assert!(!commits.is_empty());
 
