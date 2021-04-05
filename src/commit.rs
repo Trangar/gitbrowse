@@ -3,7 +3,7 @@ use crate::File;
 /// A reference to a commit in the repository.
 pub struct Commit<'a> {
     // browse: &'a GitBrowse<'a>,
-    commit: git2::Commit<'a>,
+    pub(crate) commit: git2::Commit<'a>,
 }
 
 impl<'a> Commit<'a> {

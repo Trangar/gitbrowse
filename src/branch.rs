@@ -1,4 +1,4 @@
-use crate::File;
+use crate::{Commit, File};
 
 /// A reference to a branch on the git repo.
 pub struct Branch<'a> {
@@ -20,9 +20,17 @@ impl<'a> Branch<'a> {
     }
 
     /// List all the files on the newest commit of the current branch.
-    pub fn list_files(&'a self) -> impl Iterator<Item = File<'a>> {
+    pub fn files(&'a self) -> impl Iterator<Item = File<'a>> {
         let iter = self.tree.iter();
         BranchFileIterator { branch: self, iter }
+    }
+
+    /// Returns an iterator of all the commits on this branch. Will return the newest commit first.
+    pub fn commits(&'a self) -> Result<impl Iterator<Item = Commit<'a>>, git2::Error> {
+        let commit = self.branch.get().peel_to_commit()?;
+        Ok(BranchCommitIterator {
+            commit: Some(commit),
+        })
     }
 
     /// Get a file by the given path in the last commit of the current branch.
@@ -61,4 +69,36 @@ impl<'a> Iterator for BranchFileIterator<'a> {
             }
         }
     }
+}
+
+struct BranchCommitIterator<'a> {
+    commit: Option<git2::Commit<'a>>,
+}
+
+impl<'a> Iterator for BranchCommitIterator<'a> {
+    type Item = Commit<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let commit = self.commit.take()?;
+
+        if commit.parent_count() > 0 {
+            self.commit = commit.parent(0).ok();
+        }
+        Some(Commit { commit })
+    }
+}
+
+#[test]
+fn test_commits() {
+    let repo = crate::Repo::open(".").unwrap();
+    let branches = repo.list_branches().unwrap();
+    let branch_name = branches.first().unwrap();
+    let branch = repo.browse_branch(&branch_name).unwrap();
+
+    let commits: Vec<_> = branch.commits().unwrap().collect();
+    assert!(!commits.is_empty());
+
+    // First commit of this repo
+    assert_eq!("Initial commit", commits.last().unwrap().message());
+    assert_eq!("4c247b6", commits.last().unwrap().id());
 }

@@ -21,7 +21,7 @@
 //! };
 //! println!("Current branch: {:?}", current_branch.name());
 //!
-//! for file in current_branch.list_files() {
+//! for file in current_branch.files() {
 //!     println!("Found file: {:?}", file.path());
 //!     println!("File's content is length {}", file.read_content_string()?.len());
 //!     
