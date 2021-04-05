@@ -8,10 +8,15 @@ pub struct Branch<'a> {
 }
 
 impl<'a> Branch<'a> {
-    pub(crate) fn new(repo: &'a git2::Repository, branch: &'a str) -> Result<Self, git2::Error> {
+    pub(crate) fn new(repo: &'a git2::Repository, branch: &str) -> Result<Self, git2::Error> {
         let branch = repo.find_branch(branch, git2::BranchType::Local)?;
         let tree = branch.get().peel_to_tree()?;
         Ok(Branch { repo, branch, tree })
+    }
+
+    /// Get the name of the current branch
+    pub fn name(&self) -> &str {
+        self.branch.name().unwrap().unwrap()
     }
 
     /// List all the files on the newest commit of the current branch.

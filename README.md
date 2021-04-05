@@ -17,9 +17,13 @@ for branch in &branches {
     println!(" - {}", branch);
 }
 
+let current_branch = match repo.current_branch()? {
+    Some(b) => b,
+    None => return Ok(())
+};
+println!("Current branch: {:?}", current_branch.name());
 
-let branch = repo.browse_branch(branches.first().unwrap())?;
-for file in branch.list_files() {
+for file in current_branch.list_files() {
     println!("Found file: {:?}", file.path());
     println!("File's content is length {}", file.read_content_string()?.len());
 

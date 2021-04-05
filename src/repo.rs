@@ -14,8 +14,18 @@ impl Repo {
     }
 
     /// Browse a branch with the given name. Will return an error if the branch is not found.
-    pub fn browse_branch<'a>(&'a self, branch: &'a str) -> Result<Branch<'a>, git2::Error> {
+    pub fn browse_branch<'a>(&'a self, branch: &str) -> Result<Branch<'a>, git2::Error> {
         Branch::new(&self.repo, branch)
+    }
+
+    /// Attempt to get the current branch. This will return `None` if the current git `HEAD` is detached.
+    pub fn current_branch(&self) -> Result<Option<Branch>, git2::Error> {
+        let head = self.repo.head()?;
+        Ok(if let Some(target) = head.symbolic_target() {
+            Some(self.browse_branch(target)?)
+        } else {
+            None
+        })
     }
 
     /// List all branches and the ID of the last commit of that branch.
