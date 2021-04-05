@@ -98,7 +98,10 @@ fn test_commits() {
     let commits: Vec<_> = branch.commits().unwrap().collect();
     assert!(!commits.is_empty());
 
-    // First commit of this repo
-    assert_eq!("Initial commit", commits.last().unwrap().message());
-    assert_eq!("4c247b6", commits.last().unwrap().id());
+    // on CI this checkout only has 1 commit, so protect against that
+    if commits.len() > 1 {
+        // First commit of this repo
+        assert_eq!("Initial commit", commits.last().unwrap().message());
+        assert_eq!("4c247b6", commits.last().unwrap().id());
+    }
 }
