@@ -65,11 +65,13 @@ impl<'a> Branch<'a> {
         } else {
             ""
         };
-        self.tree.get_path(std::path::Path::new(path)).map(|entry| File {
-            branch: self,
-            path: ancestor,
-            entry: entry.into()
-        })
+        self.tree
+            .get_path(std::path::Path::new(path))
+            .map(|entry| File {
+                branch: self,
+                path: ancestor,
+                entry: entry.into(),
+            })
     }
 }
 
