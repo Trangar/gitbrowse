@@ -1,16 +1,43 @@
 use crate::{Branch, Commit, Error};
-use std::path::Path;
+use std::path::PathBuf;
 
 /// A reference to a file on a certain commit.
 pub struct File<'a> {
     pub(crate) branch: &'a Branch<'a>,
-    pub(crate) entry: git2::TreeEntry<'a>,
+    pub(crate) path: &'a str,
+    pub(crate) entry: MaybeOwned<'a, git2::TreeEntry<'a>>,
+}
+
+pub(crate) enum MaybeOwned<'a, T> {
+    Borrowed(&'a T),
+    Owned(T),
+}
+
+impl<'a, T> std::ops::Deref for MaybeOwned<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        match self {
+            Self::Borrowed(b) => b,
+            Self::Owned(b) => b,
+        }
+    }
+}
+
+impl<'a, T> From<&'a T> for MaybeOwned<'a, T> {
+    fn from(b: &'a T) -> Self {
+        Self::Borrowed(b)
+    }
+}
+impl<'a, T> From<T> for MaybeOwned<'a, T> {
+    fn from(b: T) -> Self {
+        Self::Owned(b)
+    }
 }
 
 impl<'a> File<'a> {
     /// The path of the file in the repository.
-    pub fn path(&self) -> &str {
-        self.entry.name().unwrap()
+    pub fn path(&self) -> String {
+        format!("{}{}", self.path, self.entry.name().unwrap())
     }
 
     /// Read the contents of the file as a string.
@@ -35,7 +62,7 @@ impl<'a> File<'a> {
 struct FileHistory<'a> {
     file: &'a File<'a>,
     revwalk: git2::Revwalk<'a>,
-    file_path: &'a Path,
+    file_path: PathBuf,
 }
 
 impl<'a> FileHistory<'a> {
@@ -46,7 +73,7 @@ impl<'a> FileHistory<'a> {
         revwalk.push(commit.id())?;
         revwalk.set_sorting(git2::Sort::TIME)?;
 
-        let file_path = std::path::Path::new(file.path());
+        let file_path = PathBuf::from(file.path());
 
         Ok(Self {
             file,
@@ -76,7 +103,7 @@ impl<'a> FileHistory<'a> {
 
         let contains = deltas.any(|dd| {
             let new_file_path = dd.new_file().path().unwrap();
-            new_file_path.eq(self.file_path)
+            new_file_path.eq(&self.file_path)
         });
 
         Ok(if contains { Some(commit) } else { None })

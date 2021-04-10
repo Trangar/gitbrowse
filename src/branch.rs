@@ -14,15 +14,37 @@ impl<'a> Branch<'a> {
         Ok(Branch { repo, branch, tree })
     }
 
+    pub(crate) fn new_by_reference(
+        repo: &'a git2::Repository,
+        reference: git2::Reference<'a>,
+    ) -> Result<Self, Error> {
+        let branch = git2::Branch::wrap(reference);
+        let tree = branch.get().peel_to_tree()?;
+        Ok(Branch { repo, branch, tree })
+    }
+
     /// Get the name of the current branch
     pub fn name(&self) -> &str {
         self.branch.name().unwrap().unwrap()
     }
 
     /// List all the files on the newest commit of the current branch.
-    pub fn files(&'a self) -> impl Iterator<Item = File<'a>> {
-        let iter = self.tree.iter();
-        BranchFileIterator { branch: self, iter }
+    pub fn files(&'a self, mut cb: impl FnMut(File<'_>) -> Result<(), Error>) -> Result<(), Error> {
+        let mut result = Ok(());
+        self.tree
+            .walk(git2::TreeWalkMode::PreOrder, |path, entry| {
+                result = cb(File {
+                    branch: self,
+                    path,
+                    entry: entry.into(),
+                });
+                if result.is_err() {
+                    git2::TreeWalkResult::Abort
+                } else {
+                    git2::TreeWalkResult::Ok
+                }
+            })?;
+        result
     }
 
     /// Returns an iterator of all the commits on this branch. Will return the newest commit first.
@@ -44,32 +66,67 @@ impl<'a> Branch<'a> {
 
         Ok(Some(File {
             branch: self,
-            entry,
+            path,
+            entry: entry.into(),
         }))
     }
 }
 
-struct BranchFileIterator<'a> {
-    branch: &'a Branch<'a>,
-    iter: git2::TreeIter<'a>,
+/*
+TODO: Can't figure out the lifetimes for this
+
+struct BranchFileIterator<'a, 'b> {
+    branch: &'b Branch<'a>,
+    trees: Vec<(git2::Tree<'a>, usize)>,
 }
 
-impl<'a> Iterator for BranchFileIterator<'a> {
+impl<'a, 'b> BranchFileIterator<'a, 'b> {
+    pub(crate) fn new(branch: &'b Branch<'a>) -> Self {
+        Self {
+            trees: vec![(branch.tree.clone(), 0)],
+            branch,
+        }
+    }
+}
+
+impl<'a, 'b> Iterator for BranchFileIterator<'a, 'b> where 'b: 'a {
     type Item = File<'a>;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<File<'a>> {
         loop {
-            let file = self.iter.next()?;
+            let (last_tree, last_tree_idx): (git2::Tree<'a>, &mut usize) = match self.trees.last_mut() {
+                Some((last_tree, last_tree_idx)) => (last_tree.clone(), last_tree_idx),
+                None => return None
+            };
 
-            if file.kind() == Some(git2::ObjectType::Blob) {
-                return Some(File {
-                    branch: self.branch,
-                    entry: file,
-                });
+            let file: git2::TreeEntry<'a> = match last_tree.get(*last_tree_idx) {
+                Some(f) => f.clone(),
+                None => {
+                    self.trees.pop();
+                    continue;
+                }
+            };
+            *last_tree_idx += 1;
+
+            match file.kind() {
+                Some(git2::ObjectType::Blob) => {
+                    return Some(File {
+                        branch: self.branch,
+                        entry: file.into(),
+                    })
+                }
+                Some(git2::ObjectType::Tree) => {
+                    let tree: git2::Tree<'a> = file.to_object(&self.branch.repo).ok()?.peel_to_tree().ok()?.clone();
+                    self.trees.push((tree, tree.len()));
+                }
+                x => {
+                    panic!("Unknown file kind: {:?}", x);
+                }
             }
         }
     }
 }
+*/
 
 struct BranchCommitIterator<'a> {
     commit: Option<git2::Commit<'a>>,
@@ -89,21 +146,53 @@ impl<'a> Iterator for BranchCommitIterator<'a> {
 }
 
 #[test]
-fn test_commits() {
+fn test_files() {
     let repo = crate::Repo::open(".").unwrap();
-    let branches = repo.list_branches().unwrap();
 
     // Sometimes in CI we don't have any branches
-    let branch_name = match branches.first() {
-        Some(name) => name,
-        None => return,
+    let branch = match repo.current_branch().unwrap() {
+        Some(branch) => branch,
+        None => {
+            eprintln!("Warning: No branch found");
+            return;
+        }
     };
-    let branch = repo.browse_branch(&branch_name).unwrap();
 
-    assert_eq!(branch_name, branch.name());
+    println!("Found branch {:?}", branch.name());
+
+    let mut files = Vec::new();
+    branch
+        .files(|file| {
+            files.push(file.path());
+            Ok(())
+        })
+        .unwrap();
+    println!("Found {} files", files.len());
+    println!("{:#?}", files);
+
+    assert!(files.iter().any(|f| f.starts_with("src/")));
+    assert!(files.iter().any(|f| f == "Cargo.toml"));
+}
+
+#[test]
+fn test_commits() {
+    let repo = crate::Repo::open(".").unwrap();
+
+    // Sometimes in CI we don't have any branches
+    let branch = match repo.current_branch().unwrap() {
+        Some(branch) => branch,
+        None => {
+            eprintln!("Warning: No branch found");
+            return;
+        }
+    };
+
+    println!("Found branch {:?}", branch.name());
 
     let commits: Vec<_> = branch.commits().unwrap().collect();
     assert!(!commits.is_empty());
+
+    println!("Branch has {} commits", commits.len());
 
     // on CI this checkout only has 1 commit, so protect against that
     if commits.len() > 1 {

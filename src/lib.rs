@@ -21,9 +21,11 @@
 //! };
 //! println!("Current branch: {:?}", current_branch.name());
 //!
-//! for file in current_branch.files() {
+//! current_branch.files(|file| {
 //!     println!("Found file: {:?}", file.path());
-//!     println!("File's content is length {}", file.read_content_string()?.len());
+//!     if let Ok(content) = file.read_content_string() {
+//!         println!("File's content is length {}", content.len());
+//!     }
 //!     
 //!     println!("File is modified in the following commits:");
 //!     for commit in file.history()? {
@@ -31,7 +33,8 @@
 //!             println!("  {}: {}", commit.id(), commit.message());
 //!         }
 //!     }
-//! }
+//!     Ok(())
+//! })?;
 //!
 //! # Ok(())
 //! # }

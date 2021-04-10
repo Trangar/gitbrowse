@@ -24,7 +24,7 @@ impl Repo {
         Ok(if let Some(target) = head.symbolic_target() {
             Some(self.browse_branch(target)?)
         } else {
-            None
+            Some(Branch::new_by_reference(&self.repo, head)?)
         })
     }
 
