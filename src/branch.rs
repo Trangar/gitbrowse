@@ -58,17 +58,18 @@ impl<'a> Branch<'a> {
     /// Get a file by the given path in the last commit of the current branch.
     ///
     /// Will return `Ok(None)` if the file is not found.
-    pub fn get_file_by_path(&'a self, path: &'a str) -> Result<Option<File<'a>>, Error> {
-        let entry = match self.tree.get_name(path) {
-            Some(e) => e,
-            None => return Ok(None),
+    pub fn get_file_by_path(&'a self, path: &'a str) -> Result<File<'a>, Error> {
+        // HACK, this needs to be improved
+        let ancestor = if let Some(idx) = path.rfind('/') {
+            &path[..idx + 1]
+        } else {
+            ""
         };
-
-        Ok(Some(File {
+        self.tree.get_path(std::path::Path::new(path)).map(|entry| File {
             branch: self,
-            path,
-            entry: entry.into(),
-        }))
+            path: ancestor,
+            entry: entry.into()
+        })
     }
 }
 
@@ -172,6 +173,9 @@ fn test_files() {
 
     assert!(files.iter().any(|f| f.starts_with("src/")));
     assert!(files.iter().any(|f| f == "Cargo.toml"));
+
+    let file = branch.get_file_by_path("src/lib.rs").unwrap();
+    assert_eq!("src/lib.rs", file.path());
 }
 
 #[test]
