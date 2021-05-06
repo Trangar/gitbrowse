@@ -23,9 +23,12 @@ impl<'a> Branch<'a> {
         Ok(Branch { repo, branch, tree })
     }
 
-    /// Get the name of the current branch
+    /// Get the name of the current branch, or `""` if a name could not be retrieved for some reason
     pub fn name(&self) -> &str {
-        self.branch.name().unwrap().unwrap()
+        match self.branch.name() {
+            Ok(Some(name)) => name,
+            _ => "",
+        }
     }
 
     /// List all the files on the newest commit of the current branch.
