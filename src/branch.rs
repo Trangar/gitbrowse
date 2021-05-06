@@ -1,4 +1,5 @@
 use crate::{Commit, Error, File};
+use std::ffi::CString;
 
 /// A reference to a branch on the git repo.
 pub struct Branch<'a> {
@@ -75,6 +76,92 @@ impl<'a> Branch<'a> {
                 path: ancestor,
                 entry: entry.into(),
             })
+    }
+
+    /// Create a commit on the current repo
+    ///
+    /// ```rust
+    /// # use gitbrowse::*;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///
+    /// let repo = Repo::open(".")?;
+    /// let mut current_branch = match repo.current_branch()? {
+    ///     Some(b) => b,
+    ///     None => return Ok(())
+    /// };
+    ///
+    /// let commit = current_branch.create_commit("Commit from gitbrowse", |writer| {
+    ///     writer.write("foo.txt", "Hello world!")?;
+    ///     Ok(())
+    /// })?;
+    ///
+    /// println!("Commit {} has message {:?}", commit.id(), commit.message());
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn create_commit<T>(
+        &mut self,
+        message: impl AsRef<str>,
+        commit_transaction: T,
+    ) -> Result<Commit, Error>
+    where
+        T: for<'b> FnOnce(&'b mut CreateCommit<'a>) -> Result<(), Error>,
+    {
+        let mut create_commit = CreateCommit {
+            repository: &self.repo,
+            writers: Vec::new(),
+        };
+        commit_transaction(&mut create_commit)?;
+        let mut treebuilder = self.repo.treebuilder(Some(&self.tree))?;
+        for (path, writer) in create_commit.writers {
+            let oid = writer.commit()?;
+
+            // copied from https://github.com/libgit2/libgit2/blob/HEAD/include/git2/types.h#L213-220
+            const GIT_FILEMODE_BLOB: i32 = 0o0100644;
+
+            treebuilder.insert(path, oid, GIT_FILEMODE_BLOB)?;
+        }
+
+        let oid = treebuilder.write()?;
+        let tree = self.repo.find_tree(oid)?;
+        let parent_commit = self.commits()?.next().unwrap();
+
+        let commit_oid = self.repo.commit(
+            Some("HEAD"),
+            &git2::Signature::now("foo", "foo@bar.com").unwrap(),
+            &git2::Signature::now("foo", "foo@bar.com").unwrap(),
+            message.as_ref(),
+            &tree,
+            &[&parent_commit.commit],
+        )?;
+
+        let commit = self.repo.find_commit(commit_oid)?;
+
+        Ok(Commit { commit })
+    }
+}
+
+pub struct CreateCommit<'a> {
+    repository: &'a git2::Repository,
+    writers: Vec<(CString, git2::BlobWriter<'a>)>,
+}
+
+impl<'a> CreateCommit<'a> {
+    pub fn write(
+        &mut self,
+        file: impl AsRef<std::path::Path>,
+        content: impl AsRef<str>,
+    ) -> Result<(), Error> {
+        use git2::IntoCString;
+        use std::io::Write;
+
+        let path = file.as_ref();
+        let file = path.into_c_string()?;
+        let mut writer = self.repository.blob_writer(Some(path))?;
+        writer.write_all(content.as_ref().as_bytes()).unwrap();
+        self.writers.push((file, writer));
+        Ok(())
     }
 }
 
