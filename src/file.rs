@@ -47,7 +47,6 @@ impl<'a> File<'a> {
 
     /// Returns `true` if the selected file is a directory. See also [File::is_file].
     pub fn is_dir(&self) -> bool {
-        println!("{:?} is {:?}", self.path(), self.entry.kind());
         self.entry.kind() == Some(git2::ObjectType::Tree)
     }
 
