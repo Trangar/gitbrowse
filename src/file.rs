@@ -71,7 +71,13 @@ impl<'a> File<'a> {
 fn test_file_is_dir() {
     use crate::*;
     let repo = Repo::open(".").unwrap();
-    let branch = repo.current_branch().unwrap().unwrap();
+    let branch = match repo.current_branch() {
+        Ok(Some(branch)) => branch,
+        _ => {
+            // in CI we don't always have a HEAD branch.
+            return;
+        }
+    };
     branch
         .files(|f| {
             if f.path() == "src" || f.path() == ".github" || f.path() == ".github/workflows" {

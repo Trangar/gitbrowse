@@ -153,9 +153,9 @@ fn test_files() {
     let repo = crate::Repo::open(".").unwrap();
 
     // Sometimes in CI we don't have any branches
-    let branch = match repo.current_branch().unwrap() {
-        Some(branch) => branch,
-        None => {
+    let branch = match repo.current_branch() {
+        Ok(Some(branch)) => branch,
+        _ => {
             eprintln!("Warning: No branch found");
             return;
         }
