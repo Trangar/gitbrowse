@@ -40,9 +40,20 @@ impl<'a> File<'a> {
         format!("{}{}", self.path, self.entry.name().unwrap())
     }
 
+    /// Returns `true` if the selected file is an actual file. See also [File::is_dir].
+    pub fn is_file(&self) -> bool {
+        self.entry.kind() == Some(git2::ObjectType::Blob)
+    }
+
+    /// Returns `true` if the selected file is a directory. See also [File::is_file].
+    pub fn is_dir(&self) -> bool {
+        println!("{:?} is {:?}", self.path(), self.entry.kind());
+        self.entry.kind() == Some(git2::ObjectType::Tree)
+    }
+
     /// Read the contents of the file as a string.
     /// Will use a lossy encoding.
-    /// See [String::from_utf_lossy] for more information.
+    /// See [String::from_utf8_lossy] for more information.
     pub fn read_content_string(&self) -> Result<String, Error> {
         let object = self.entry.to_object(self.branch.repo)?;
         let blob = object.peel_to_blob()?;
@@ -54,6 +65,29 @@ impl<'a> File<'a> {
     pub fn history(&'a self) -> Result<impl Iterator<Item = Result<Commit<'a>, Error>>, Error> {
         FileHistory::new(self)
     }
+}
+
+#[test]
+fn test_file_is_dir() {
+    use crate::*;
+    let repo = Repo::open(".").unwrap();
+    let branch = match repo.current_branch() {
+        Ok(Some(branch)) => branch,
+        _ => {
+            // in CI we don't always have a HEAD branch.
+            return;
+        }
+    };
+    branch
+        .files(|f| {
+            if f.path() == "src" || f.path() == ".github" || f.path() == ".github/workflows" {
+                assert!(f.is_dir());
+            } else {
+                assert!(!f.is_dir());
+            }
+            Ok(())
+        })
+        .unwrap();
 }
 
 // Huge thanks to kvzn on github
