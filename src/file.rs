@@ -50,6 +50,13 @@ impl<'a> File<'a> {
         self.entry.kind() == Some(git2::ObjectType::Tree)
     }
 
+    /// Read the raw contents of the file.
+    pub fn read_content(&self) -> Result<Vec<u8>, Error> {
+        let object = self.entry.to_object(self.branch.repo)?;
+        let blob = object.peel_to_blob()?;
+        Ok(blob.content().to_vec())
+    }
+
     /// Read the contents of the file as a string.
     /// Will use a lossy encoding.
     /// See [String::from_utf8_lossy] for more information.
