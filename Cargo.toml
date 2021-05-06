@@ -1,6 +1,6 @@
 [package]
 name = "gitbrowse"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Trangar <victor.koenders@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
