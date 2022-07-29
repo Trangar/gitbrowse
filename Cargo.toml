@@ -13,7 +13,7 @@ repository = "https://github.com/trangar/gitbrowse"
 github = { repository = "Trangar/gitbrowse", workflow = "Rust" }
 
 [dependencies.git2]
-version = "0.14"
+version = "0.15"
 default-features = false
 
 [features]
